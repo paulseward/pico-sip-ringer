@@ -76,7 +76,7 @@ call_id = "picow-%d" % random.getrandbits(24)
 cseq = 1
 
 def send_register(auth=None):
-    print("SND: REGISTER")
+    print("Sent ==> REGISTER")
     global cseq
 
     uri = "sip:%s" % SIP_DOMAIN
@@ -106,6 +106,7 @@ def send_register(auth=None):
     cseq += 1
 
 def build_response(code, reason, req):
+    print("Sent ==> %s %s" % (code, reason))
     h = parse_headers(req)
     to_hdr = h.get("To", "")
     if ";tag=" not in to_hdr:
@@ -143,7 +144,7 @@ while True:
         msg = data.decode()
 
         if msg.startswith("SIP/2.0 401"):
-            print("RCV: 401 Unauthorized")
+            print("Recv <== 401 Unauthorized")
             auth = extract_auth(msg)
             if "realm" in auth and "nonce" in auth:
                 uri = "sip:%s" % SIP_DOMAIN
@@ -158,26 +159,28 @@ while True:
                 send_register(auth)
 
         elif msg.startswith("INVITE "):
-            print("RCV: INVITE")
+            print("Recv <== INVITE")
             BOARD_LED.on() # Blink the board LED
             RING_PIN.on()  # Blink the offboard LEDs
             sock.sendto(build_response(100, "Trying", msg).encode(), addr)
             sock.sendto(build_response(180, "Ringing", msg).encode(), addr)
 
         elif msg.startswith("CANCEL "):
-            print("RCV: CANCEL")
+            print("Recv <== CANCEL")
             BOARD_LED.off()
             RING_PIN.off()
             sock.sendto(build_response(200, "OK", msg).encode(), addr)
 
         elif msg.startswith("OPTIONS "):
-            print("RCV: OPTIONS")
+            print("Recv <== OPTIONS")
             sock.sendto(build_response(200, "OK", msg).encode(), addr)
+
+        elif msg.startswith("SIP/2.0 200"):
+            print("Recv <== 200 OK")
             
-#        else:
-#            print("RCV: UNKNOWN")
-#            print(msg)
-#            sock.sendto(build_response(200, "OK", msg).encode(), addr)
+        else:
+            print("Recv <== UNKNOWN")
+            print(msg)
 
     except OSError:
         pass
