@@ -26,10 +26,10 @@ SIP_DOMAIN = ASTERISK_IP
 LOCAL_PORT = 5060
 REGISTER_INTERVAL = 90
 
-RING_PIN = machine.Pin(15, machine.Pin.OUT)
+# Configure some blinking pins
+RING_PIN = Blinker(pin=15, freq=6)
 RING_PIN.off()
-
-BOARD_LED = machine.Pin("LED", machine.Pin.OUT)
+BOARD_LED = Blinker(pin="LED", freq=6)
 BOARD_LED.off()
 
 def md5(s):
@@ -76,6 +76,7 @@ call_id = "picow-%d" % random.getrandbits(24)
 cseq = 1
 
 def send_register(auth=None):
+    print("SND: REGISTER")
     global cseq
 
     uri = "sip:%s" % SIP_DOMAIN
@@ -129,7 +130,6 @@ def build_response(code, reason, req):
 
 send_register()
 next_reg = time.time() + REGISTER_INTERVAL
-blinker = Blinker()
 
 while True:
     now = time.time()
@@ -143,6 +143,7 @@ while True:
         msg = data.decode()
 
         if msg.startswith("SIP/2.0 401"):
+            print("RCV: 401 Unauthorized")
             auth = extract_auth(msg)
             if "realm" in auth and "nonce" in auth:
                 uri = "sip:%s" % SIP_DOMAIN
@@ -157,20 +158,26 @@ while True:
                 send_register(auth)
 
         elif msg.startswith("INVITE "):
-            # BOARD_LED.on()
-            blinker.on()
-            RING_PIN.on()
+            print("RCV: INVITE")
+            BOARD_LED.on() # Blink the board LED
+            RING_PIN.on()  # Blink the offboard LEDs
             sock.sendto(build_response(100, "Trying", msg).encode(), addr)
             sock.sendto(build_response(180, "Ringing", msg).encode(), addr)
 
         elif msg.startswith("CANCEL "):
-            # BOARD_LED.off()
-            blinker.off()
+            print("RCV: CANCEL")
+            BOARD_LED.off()
             RING_PIN.off()
             sock.sendto(build_response(200, "OK", msg).encode(), addr)
 
         elif msg.startswith("OPTIONS "):
+            print("RCV: OPTIONS")
             sock.sendto(build_response(200, "OK", msg).encode(), addr)
+            
+#        else:
+#            print("RCV: UNKNOWN")
+#            print(msg)
+#            sock.sendto(build_response(200, "OK", msg).encode(), addr)
 
     except OSError:
         pass
