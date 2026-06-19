@@ -9,5 +9,4 @@ Terrible, vibe coded, minimal SIP stack in micropython for the raspberry pi pico
 TODO:
 * Make the wifi connection a bit better
 * Useful debug info
-* Gracefully catch SIP methods we haven't implemented
 * Make it less terrible/more robust

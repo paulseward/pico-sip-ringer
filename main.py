@@ -12,6 +12,7 @@ import time
 import machine
 import hashlib
 import random
+from blinker import Blinker
 
 # change these bits
 SSID = "wifissid"
@@ -128,6 +129,7 @@ def build_response(code, reason, req):
 
 send_register()
 next_reg = time.time() + REGISTER_INTERVAL
+blinker = Blinker()
 
 while True:
     now = time.time()
@@ -155,13 +157,15 @@ while True:
                 send_register(auth)
 
         elif msg.startswith("INVITE "):
-            BOARD_LED.on()
+            # BOARD_LED.on()
+            blinker.on()
             RING_PIN.on()
             sock.sendto(build_response(100, "Trying", msg).encode(), addr)
             sock.sendto(build_response(180, "Ringing", msg).encode(), addr)
 
         elif msg.startswith("CANCEL "):
-            BOARD_LED.off()
+            # BOARD_LED.off()
+            blinker.off()
             RING_PIN.off()
             sock.sendto(build_response(200, "OK", msg).encode(), addr)
 
