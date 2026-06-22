@@ -9,13 +9,17 @@ class Blinker:
     def _blink(self, t):
         self.led.toggle()
 
-    def on(self):
+    def blink(self):
         freq=self.freq
         self.timer.init(
             freq=freq,
             mode=Timer.PERIODIC,
             callback=self._blink
         )
+
+    def on(self):
+        self.timer.deinit()
+        self.led.on()
 
     def off(self):
         self.timer.deinit()
