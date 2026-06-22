@@ -26,9 +26,11 @@ SIP_DOMAIN = ASTERISK_IP
 LOCAL_PORT = 5060
 REGISTER_INTERVAL = 90
 
-# Configure some blinking pins
-RING_PIN = Blinker(pin=15, freq=6)
-RING_PIN.off()
+# Stupid mosfet module is active-low, so this one has to be inverted
+RING_PIN = Blinker(pin=15, freq=6) 
+RING_PIN.on()
+
+# The on-board LED is active-high
 BOARD_LED = Blinker(pin="LED", freq=6)
 BOARD_LED.off()
 
@@ -67,6 +69,8 @@ while not wlan.isconnected():
     time.sleep(0.2)
 
 LOCAL_IP = wlan.ifconfig()[0]
+print("Wifi Connected: %s" % SSID)
+print("            IP: %s" % LOCAL_IP)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("0.0.0.0", LOCAL_PORT))
@@ -143,6 +147,19 @@ while True:
         data, addr = sock.recvfrom(4096)
         msg = data.decode()
 
+        # Ignore(but dump) any packet that's not from the asterisk we're registered to
+        if (addr[0] != ASTERISK_IP):
+            print("Error: Received unexpected packet from %s" % addr[0])
+            print(msg)
+            continue 
+
+        # Parse the headers
+        headers = {}
+        for line in msg.split("\n"):
+            if ":" in line:
+                key, value = line.split(":", 1)
+                headers[key.strip()] = value.strip()
+        
         if msg.startswith("SIP/2.0 401"):
             print("Recv <== 401 Unauthorized")
             auth = extract_auth(msg)
@@ -160,16 +177,26 @@ while True:
 
         elif msg.startswith("INVITE "):
             print("Recv <== INVITE")
-            BOARD_LED.on() # Blink the board LED
-            RING_PIN.on()  # Blink the offboard LEDs
-            sock.sendto(build_response(100, "Trying", msg).encode(), addr)
-            sock.sendto(build_response(180, "Ringing", msg).encode(), addr)
+            # Check this INVITE is for us, by examining the To: header
+            # To: <sip:ringer@10.1.2.3:5060>
+            if headers.get("To").startswith("<sip:%s@" % USERNAME):
+                BOARD_LED.blink() # Blink the board LED
+                RING_PIN.blink()  # Blink the offboard LEDs
+                sock.sendto(build_response(100, "Trying", msg).encode(), addr)
+                sock.sendto(build_response(180, "Ringing", msg).encode(), addr)
+            else:
+                print("Error: Received unexpected INVITE")
+                print(msg)
 
         elif msg.startswith("CANCEL "):
             print("Recv <== CANCEL")
-            BOARD_LED.off()
-            RING_PIN.off()
-            sock.sendto(build_response(200, "OK", msg).encode(), addr)
+            if headers.get("To").startswith("<sip:%s@" % USERNAME):
+                BOARD_LED.off()
+                RING_PIN.on() # stupid mosfet is active-low, so "on" is off...
+                sock.sendto(build_response(200, "OK", msg).encode(), addr)
+            else:
+                print("Error: Received unexpected CANCEL")
+                print(msg)
 
         elif msg.startswith("OPTIONS "):
             print("Recv <== OPTIONS")
