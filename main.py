@@ -26,9 +26,8 @@ SIP_DOMAIN = ASTERISK_IP
 LOCAL_PORT = 5060
 REGISTER_INTERVAL = 90
 
-# Stupid mosfet module is active-low, so this one has to be inverted
 RING_PIN = Blinker(pin=15, freq=6) 
-RING_PIN.on()
+RING_PIN.off()
 
 # The on-board LED is active-high
 BOARD_LED = Blinker(pin="LED", freq=6)
@@ -179,7 +178,11 @@ while True:
             print("Recv <== INVITE")
             # Check this INVITE is for us, by examining the To: header
             # To: <sip:ringer@10.1.2.3:5060>
-            if headers.get("To").startswith("<sip:%s@" % USERNAME):
+            if not headers.get("Call-ID", ""):
+                print("Error: INVITE didn't contain a Call-ID")
+                print(msg)
+                continue
+            if headers.get("To", "").startswith("<sip:%s@" % USERNAME):
                 BOARD_LED.blink() # Blink the board LED
                 RING_PIN.blink()  # Blink the offboard LEDs
                 sock.sendto(build_response(100, "Trying", msg).encode(), addr)
@@ -187,12 +190,13 @@ while True:
             else:
                 print("Error: Received unexpected INVITE")
                 print(msg)
+                continue
 
         elif msg.startswith("CANCEL "):
             print("Recv <== CANCEL")
             if headers.get("To").startswith("<sip:%s@" % USERNAME):
                 BOARD_LED.off()
-                RING_PIN.on() # stupid mosfet is active-low, so "on" is off...
+                RING_PIN.off()
                 sock.sendto(build_response(200, "OK", msg).encode(), addr)
             else:
                 print("Error: Received unexpected CANCEL")
