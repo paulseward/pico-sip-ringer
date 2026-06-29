@@ -26,11 +26,12 @@ SIP_DOMAIN = ASTERISK_IP
 LOCAL_PORT = 5060
 REGISTER_INTERVAL = 90
 
-RING_PIN = Blinker(pin=15, freq=6) 
+# RING_PIN = Blinker(pin=15, freq=1.5)
+RING_PIN = Blinker(pin=15, freq='GPO')
 RING_PIN.off()
 
-# The on-board LED is active-high
-BOARD_LED = Blinker(pin="LED", freq=6)
+# BOARD_LED = Blinker(pin='LED', freq=1.5)
+BOARD_LED = Blinker(pin='LED', freq='GPO')
 BOARD_LED.off()
 
 def md5(s):
