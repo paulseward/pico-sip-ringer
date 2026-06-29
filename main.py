@@ -12,25 +12,29 @@ import time
 import machine
 import hashlib
 import random
+import ujson as json
+
 from blinker import Blinker
 
-# change these bits
-SSID = "wifissid"
-PASSWORD = "wifipassword"
-ASTERISK_IP = "192.168.1.1"
-USERNAME = "ringer"
-PASSWORD_SIP = "changeme"
-# /change these bits
+# See config.json.example
+with open("config.json") as f:
+    config = json.load(f)
 
-SIP_DOMAIN = ASTERISK_IP
+SSID      = config.get("ssid", "emf")
+WIFI_PASS = config.get("wifi_pass", "emf")
+SIP_IP    = config.get("sip_ip")
+SIP_USER  = config.get("sip_user")
+SIP_PASS  = config.get("sip_pass")
+LED_PIN   = config.get("led_pin", 15)
+LED_FREQ  = config.get("led_freq", "GPO")
+
+SIP_DOMAIN = SIP_IP
 LOCAL_PORT = 5060
 REGISTER_INTERVAL = 90
 
-# RING_PIN = Blinker(pin=15, freq=1.5)
-RING_PIN = Blinker(pin=15, freq='GPO')
+RING_PIN = Blinker(pin=LED_PIN, freq=LED_FREQ)
 RING_PIN.off()
 
-# BOARD_LED = Blinker(pin='LED', freq=1.5)
 BOARD_LED = Blinker(pin='LED', freq='GPO')
 BOARD_LED.off()
 
@@ -64,7 +68,7 @@ def extract_auth(msg):
 
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
-wlan.connect(SSID, PASSWORD)
+wlan.connect(SSID, WIFI_PASS)
 while not wlan.isconnected():
     time.sleep(0.2)
 
@@ -88,25 +92,25 @@ def send_register(auth=None):
     msg = [
         "REGISTER %s SIP/2.0" % uri,
         "Via: SIP/2.0/UDP %s:%d;branch=z9hG4bK%d" % (LOCAL_IP, LOCAL_PORT, random.getrandbits(24)),
-        "From: <sip:%s@%s>;tag=1" % (USERNAME, SIP_DOMAIN),
-        "To: <sip:%s@%s>" % (USERNAME, SIP_DOMAIN),
+        "From: <sip:%s@%s>;tag=1" % (SIP_USER, SIP_DOMAIN),
+        "To: <sip:%s@%s>" % (SIP_USER, SIP_DOMAIN),
         "Call-ID: %s" % call_id,
         "CSeq: %d REGISTER" % cseq,
-        "Contact: <sip:%s@%s:%d>" % (USERNAME, LOCAL_IP, LOCAL_PORT),
+        "Contact: <sip:%s@%s:%d>" % (SIP_USER, LOCAL_IP, LOCAL_PORT),
         "Expires: 120",
     ]
 
     if auth:
         msg.append(
             'Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s"'
-            % (USERNAME, auth["realm"], auth["nonce"], uri, auth["response"])
+            % (SIP_USER, auth["realm"], auth["nonce"], uri, auth["response"])
         )
 
     msg.append("Content-Length: 0")
     msg.append("")
     msg.append("")
 
-    sock.sendto("\r\n".join(msg).encode(), (ASTERISK_IP, 5060))
+    sock.sendto("\r\n".join(msg).encode(), (SIP_IP, 5060))
     cseq += 1
 
 def build_response(code, reason, req):
@@ -148,7 +152,7 @@ while True:
         msg = data.decode()
 
         # Ignore(but dump) any packet that's not from the asterisk we're registered to
-        if (addr[0] != ASTERISK_IP):
+        if (addr[0] != SIP_IP):
             print("Error: Received unexpected packet from %s" % addr[0])
             print(msg)
             continue 
@@ -166,9 +170,9 @@ while True:
             if "realm" in auth and "nonce" in auth:
                 uri = "sip:%s" % SIP_DOMAIN
                 auth["response"] = digest_response(
-                    USERNAME,
+                    SIP_USER,
                     auth["realm"],
-                    PASSWORD_SIP,
+                    SIP_PASS,
                     auth["nonce"],
                     "REGISTER",
                     uri,
@@ -183,7 +187,7 @@ while True:
                 print("Error: INVITE didn't contain a Call-ID")
                 print(msg)
                 continue
-            if headers.get("To", "").startswith("<sip:%s@" % USERNAME):
+            if headers.get("To", "").startswith("<sip:%s@" % SIP_USER):
                 BOARD_LED.blink() # Blink the board LED
                 RING_PIN.blink()  # Blink the offboard LEDs
                 sock.sendto(build_response(100, "Trying", msg).encode(), addr)
@@ -195,7 +199,7 @@ while True:
 
         elif msg.startswith("CANCEL "):
             print("Recv <== CANCEL")
-            if headers.get("To").startswith("<sip:%s@" % USERNAME):
+            if headers.get("To").startswith("<sip:%s@" % SIP_USER):
                 BOARD_LED.off()
                 RING_PIN.off()
                 sock.sendto(build_response(200, "OK", msg).encode(), addr)

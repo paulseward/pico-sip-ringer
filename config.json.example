@@ -1,0 +1,9 @@
+{
+    "ssid": "wifissid",
+    "wifi_pass": "wifipassword",
+    "sip_ip": "192.168.1.1",
+    "sip_user": "ringer",
+    "sip_pass": "changeme",
+    "led_pin": 15,
+    "led_freq": 1.5
+}
