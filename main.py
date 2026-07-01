@@ -68,8 +68,10 @@ def extract_auth(msg):
 
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
+print("Connecting to: %s" % SSID)
 wlan.connect(SSID, WIFI_PASS)
 while not wlan.isconnected():
+    print(".", end="")
     time.sleep(0.2)
 
 LOCAL_IP = wlan.ifconfig()[0]
@@ -84,7 +86,7 @@ call_id = "picow-%d" % random.getrandbits(24)
 cseq = 1
 
 def send_register(auth=None):
-    print("Sent ==> REGISTER")
+    print("Sent ==> REGISTER[%s]" % SIP_IP)
     global cseq
 
     uri = "sip:%s" % SIP_DOMAIN
